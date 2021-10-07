@@ -3,6 +3,7 @@ use std::iter::FromIterator;
 use std::{borrow::Cow, collections::HashSet};
 
 use conv::ValueInto;
+use image::imageops::colorops;
 use image::{imageops, Pixel};
 use imageproc::{
     definitions::{Clamp, Image},
@@ -19,6 +20,9 @@ const CWISE_LABEL: &str = "Rotated 90 degrees clockwise";
 const CCWISE_LABEL: &str = "Rotated 90 degrees counterclockwise";
 const UPSIDE_DOWN_LABEL: &str = "Upside-down";
 const OFF_AXIS_LABEL: &str = "Rotated off-axis";
+const BRIGHTEN_LABEL: &str = "Bright";
+const DARKEN_LABEL: &str = "Dark";
+const BLURRED_LABEL: &str = "Blurred";
 
 fn rad_to_deg(rad: f64) -> f64 {
     rad * 180. / PI
@@ -82,7 +86,7 @@ where
     }
 
     fn name(&self) -> Cow<str> {
-        format!("off_axis_{:.2}_deg", rad_to_deg(self.radians)).into()
+        format!("rot_{:.2}_deg", rad_to_deg(self.radians)).into()
     }
 }
 
@@ -119,7 +123,7 @@ impl<P: Pixel + 'static> ImageStage<P> for ClockwiseStage {
     }
 
     fn name(&self) -> Cow<str> {
-        "clockwise".into()
+        "clowise".into()
     }
 }
 
@@ -134,7 +138,7 @@ impl<P: Pixel + 'static> ImageStage<P> for CclockwiseStage {
     }
 
     fn name(&self) -> Cow<str> {
-        "counterclockwise".into()
+        "couwise".into()
     }
 }
 
@@ -149,6 +153,99 @@ impl<P: Pixel + 'static> ImageStage<P> for UpsideDownStage {
     }
 
     fn name(&self) -> Cow<str> {
-        "upside_down".into()
+        "up_down".into()
+    }
+}
+
+pub struct LuminosityBuilder {
+    pub min_luma: i32,
+    pub max_luma: i32,
+}
+
+impl<P: Pixel + 'static, R: Rng> StageBuilder<P, R> for LuminosityBuilder {
+    fn variations(&self) -> usize {
+        2
+    }
+
+    fn should_execute(&self, tags: &Tags) -> bool {
+        !(tags.0.contains(BRIGHTEN_LABEL) || tags.0.contains(DARKEN_LABEL))
+    }
+
+    fn build_stage(&self, rng: &mut R) -> Vec<Box<dyn ImageStage<P> + Send + Sync>> {
+        vec![
+            Box::new(LuminosityStage {
+                value: rng.gen_range(self.min_luma..self.max_luma),
+            }),
+            Box::new(LuminosityStage {
+                value: rng.gen_range(-self.max_luma..-self.min_luma),
+            }),
+        ]
+    }
+}
+
+pub struct LuminosityStage {
+    value: i32,
+}
+
+impl<P: Pixel + 'static> ImageStage<P> for LuminosityStage {
+    fn execute(&self, img: &Image<P>) -> (Image<P>, Tags) {
+        let mut img = img.clone();
+        colorops::brighten_in_place(&mut img, self.value);
+        (
+            img,
+            Tags(HashSet::from_iter([if self.value < 0 {
+                DARKEN_LABEL.to_owned()
+            } else {
+                BRIGHTEN_LABEL.to_owned()
+            }])),
+        )
+    }
+
+    fn name(&self) -> Cow<str> {
+        if self.value < 0 {
+            format!("bright_{}", self.value).into()
+        } else {
+            format!("dark_{}", self.value).into()
+        }
+    }
+}
+
+pub struct BlurBuilder {
+    pub samples: usize,
+    pub min_sigma: f32,
+    pub max_sigma: f32,
+}
+
+impl<P: Pixel + 'static, R: Rng> StageBuilder<P, R> for BlurBuilder {
+    fn variations(&self) -> usize {
+        self.samples
+    }
+
+    fn should_execute(&self, tags: &Tags) -> bool {
+        !(tags.0.contains(BLURRED_LABEL))
+    }
+
+    fn build_stage(&self, rng: &mut R) -> Vec<Box<dyn ImageStage<P> + Send + Sync>> {
+        rng.sample_iter(Uniform::from(self.min_sigma..self.max_sigma))
+            .take(self.samples)
+            .map(|sigma| Box::new(BlurStage { sigma }) as Box<dyn ImageStage<_> + Send + Sync>)
+            .collect()
+    }
+}
+
+pub struct BlurStage {
+    pub sigma: f32,
+}
+
+impl<P: Pixel + 'static> ImageStage<P> for BlurStage {
+    fn execute(&self, img: &Image<P>) -> (Image<P>, Tags) {
+        (
+            imageops::blur(img, self.sigma),
+            Tags(HashSet::from_iter([BLURRED_LABEL.to_owned()])),
+        )
+    }
+
+    fn name(&self) -> Cow<str> {
+        format!("blur_{:0.2}", self.sigma).into()
     }
 }

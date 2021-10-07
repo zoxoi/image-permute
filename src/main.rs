@@ -15,6 +15,8 @@ mod util;
 
 use std::{collections::HashSet, fs, iter::Iterator, path::Path};
 
+use crate::stages::BlurBuilder;
+
 #[derive(Clone, PartialEq, Eq, Default, Debug)]
 struct Tags(pub HashSet<String>);
 
@@ -41,7 +43,7 @@ impl<P: AsRef<Path>> TaggedImage<P> {
 
 fn main() {
     use executors::FusedExecutor;
-    use stages::{OffAxisRotationBuilder, RotationBuilder};
+    use stages::{LuminosityBuilder, OffAxisRotationBuilder, RotationBuilder};
 
     let files: Vec<_> = glob("./images/*")
         .unwrap()
@@ -49,9 +51,18 @@ fn main() {
         .collect();
 
     let transformer: FusedExecutor<StdRng, _> = FusedExecutor::new("./processed")
+        .add_stage(Box::new(BlurBuilder {
+            samples: 2,
+            min_sigma: 5.,
+            max_sigma: 10.,
+        }))
+        .add_stage(Box::new(LuminosityBuilder {
+            min_luma: 30,
+            max_luma: 50,
+        }))
         .add_stage(Box::new(OffAxisRotationBuilder {
             samples: 3,
-            deg_limit: 80.,
+            deg_limit: 40.,
         }))
         .add_stage(Box::new(RotationBuilder));
 

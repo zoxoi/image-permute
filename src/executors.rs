@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 use std::path::Path;
 
-use image::Rgba;
+use image::{imageops, Rgba};
 use imageproc::definitions::Image;
 use rand::{Rng, SeedableRng};
 
@@ -64,7 +64,7 @@ where
                     .enumerate()
                     // This generates way more stages than used because we regenerate the variant every time,
                     // however due to the fixed seeding it works out, I do this because Rust would NOT
-                    // move the variant out the vec despite it immediately going out of scope.
+                    // move the variant out of the vec despite it immediately going out of scope.
                     .filter_map(|(idx, variant)| {
                         let mut rng = R::seed_from_u64(seed);
                         if variant > 0 {
@@ -79,7 +79,7 @@ where
             })
             .par_bridge()
             .for_each(|stages| {
-                let mut name = name.to_owned();
+                let mut name = name[..name.len().min(10)].to_owned();
                 let mut img = img.clone();
                 for (variant, stage) in stages {
                     img = stage[variant - 1].execute(&img).0;
@@ -87,7 +87,7 @@ where
                 }
                 let mut path = self.out_dir.as_ref().to_path_buf();
                 path.push(name + ".png");
-                img.save(path).unwrap();
+                imageops::thumbnail(&img, 512, 512).save(path).unwrap();
             });
     }
 }
