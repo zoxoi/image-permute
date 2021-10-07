@@ -43,7 +43,10 @@ where
         P: AsRef<Path>,
     {
         images.into_par_iter().for_each(|img| {
-            let loaded = image::open(&img.img).unwrap();
+            let loaded = match image::open(&img.img) {
+                Ok(loaded) => loaded,
+                Err(_) => return,
+            };
             let name = img.img.as_ref().file_stem().unwrap();
             self.all_pipelines(&img.tags, loaded.to_rgba8(), name.to_str().unwrap())
         });
@@ -75,8 +78,7 @@ where
                     })
                     .collect::<Vec<_>>()
             })
-            .collect::<Vec<_>>()
-            .par_iter()
+            .par_bridge()
             .for_each(|stages| {
                 let mut name = name.to_owned();
                 let mut img = img.clone();
