@@ -203,9 +203,9 @@ impl<P: Pixel + 'static> ImageStage<P> for LuminosityStage {
 
     fn name(&self) -> Cow<str> {
         if self.value < 0 {
-            format!("bright_{}", self.value).into()
-        } else {
             format!("dark_{}", self.value).into()
+        } else {
+            format!("bright_{}", self.value).into()
         }
     }
 }
