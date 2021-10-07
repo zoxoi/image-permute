@@ -7,7 +7,7 @@ use rand::{Rng, SeedableRng};
 
 use crate::{traits::StageBuilder, util::SetEnumerator, TaggedImage, Tags};
 
-pub struct FusedExecutor<R, OP>
+pub struct ParallelStageExecutor<R, OP>
 where
     R: SeedableRng + Rng,
     OP: AsRef<Path>,
@@ -16,7 +16,7 @@ where
     out_dir: OP,
 }
 
-impl<R, OP> FusedExecutor<R, OP>
+impl<R, OP> ParallelStageExecutor<R, OP>
 where
     R: SeedableRng + Rng,
     OP: AsRef<Path> + 'static + Sync,

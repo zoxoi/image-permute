@@ -42,7 +42,7 @@ impl<P: AsRef<Path>> TaggedImage<P> {
 }
 
 fn main() {
-    use executors::FusedExecutor;
+    use executors::ParallelStageExecutor;
     use stages::RotationBuilder;
 
     let files: Vec<_> = glob("./images/*")
@@ -50,7 +50,7 @@ fn main() {
         .map(|fname| TaggedImage::from_iter(fname.unwrap(), vec![]))
         .collect();
 
-    let transformer: FusedExecutor<StdRng, _> = FusedExecutor::new("./processed")
+    let transformer: ParallelStageExecutor<StdRng, _> = ParallelStageExecutor::new("./processed")
         .add_stage(Box::new(BlurBuilder {
             samples: 1,
             min_sigma: 5.,
