@@ -1,2 +1,5 @@
 /target
 images
+processed
+.DS_Store
+.idea
