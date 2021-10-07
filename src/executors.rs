@@ -1,3 +1,5 @@
+//! This module contains executors for running image processing stages in parallel.
+
 use rayon::prelude::*;
 use std::path::Path;
 
@@ -7,12 +9,24 @@ use rand::{Rng, SeedableRng};
 
 use crate::{traits::StageBuilder, util::SetEnumerator, TaggedImage, Tags};
 
+/// Creates series of stages that can then be [`execute`]d to perform every variation and combination
+/// of image transformation requested in parallel.
+///
+/// [`execute`]: about:blank
 pub struct ParallelStageExecutor<R, OP>
 where
     R: SeedableRng + Rng,
     OP: AsRef<Path>,
 {
+    /// A list of builders, that will be executed in order (when present) on each image.
+    /// Note that these are *builders* and the stages themselves are built on demand
+    /// when given an image during the execution phase.
+    ///
+    /// The static `rgba8` color space is due to a limitation with `Image` that does not
+    /// allow you to convert between color-spaces generically.
     stages: Vec<Box<dyn StageBuilder<Rgba<u8>, R> + Send + Sync>>,
+
+    /// A path to the directory under which to save the output files.
     out_dir: OP,
 }
 
@@ -21,6 +35,8 @@ where
     R: SeedableRng + Rng,
     OP: AsRef<Path> + 'static + Sync,
 {
+    /// Creates an empty executor (one with no stages), whose output directory
+    /// is set to `out_dir`.
     pub fn new(out_dir: OP) -> Self {
         Self {
             stages: vec![],
@@ -28,6 +44,10 @@ where
         }
     }
 
+    /// Adds a new stage to the executor, for each image all [`StageBuilder::variations()`]
+    /// will be generated, including the variations where this stage isn't executed.
+    ///
+    /// [`StageBuilder::variations()`]: about:blank
     pub(crate) fn add_stage(
         mut self,
         stage: Box<dyn StageBuilder<Rgba<u8>, R> + Send + Sync>,
@@ -36,6 +56,9 @@ where
         self
     }
 
+    /// Executes the pipeline, with a separate worker for each image, each combination/variation
+    /// of stages will then be built out for the image, and then those transformations will happen
+    /// in parallel. The RNG when building the image will be set based on the image's name.
     pub(crate) fn execute<I, P>(&self, images: I)
     where
         I: IntoParallelIterator<Item = TaggedImage<P>>,
@@ -51,6 +74,8 @@ where
         });
     }
 
+    /// Executes all pipelines for a single image, this is the workhorse that generates
+    /// all stage variations and then schedules them on rayon workers.
     fn all_pipelines(&self, tags: &Tags, img: Image<Rgba<u8>>, name: &str) {
         // TMP, do a better seed fixing
         let seed = name.chars().map(|c| c as u64).sum();

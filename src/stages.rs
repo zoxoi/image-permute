@@ -1,3 +1,6 @@
+//! Contains stage builders to put in parallel executors when processing images, as well
+//! as the definitions of the underlying stages themselves.
+
 use std::f64::consts::PI;
 use std::iter::FromIterator;
 use std::{borrow::Cow, collections::HashSet};
@@ -16,24 +19,40 @@ use rand::Rng;
 use crate::traits::{ImageStage, StageBuilder};
 use crate::Tags;
 
-const CWISE_LABEL: &str = "Rotated 90 degrees clockwise";
-const CCWISE_LABEL: &str = "Rotated 90 degrees counterclockwise";
-const UPSIDE_DOWN_LABEL: &str = "Upside-down";
-const OFF_AXIS_LABEL: &str = "Rotated off-axis";
-const BRIGHTEN_LABEL: &str = "Bright";
-const DARKEN_LABEL: &str = "Dark";
-const BLURRED_LABEL: &str = "Blurred";
+/* Label constants for different tags, should be moved into a config file eventually */
 
+mod consts {
+    #![allow(clippy::missing_docs_in_private_items)]
+
+    pub(super) const CWISE_LABEL: &str = "Rotated 90 degrees clockwise";
+    pub(super) const CCWISE_LABEL: &str = "Rotated 90 degrees counterclockwise";
+    pub(super) const UPSIDE_DOWN_LABEL: &str = "Upside-down";
+    pub(super) const OFF_AXIS_LABEL: &str = "Rotated off-axis";
+    pub(super) const BRIGHTEN_LABEL: &str = "Bright";
+    pub(super) const DARKEN_LABEL: &str = "Dark";
+    pub(super) const BLURRED_LABEL: &str = "Blurred";
+}
+
+use consts::*;
+
+/// Converts the radians `rad` to degrees.
 fn rad_to_deg(rad: f64) -> f64 {
     rad * 180. / PI
 }
 
+/// Converts the degrees `deg` to radians.
 fn deg_to_rad(deg: f64) -> f64 {
     deg * PI / 180.
 }
 
+/// Creates a builder which will yield `samples` stages, which will rotate the image
+/// (without changing the dimensions) between `-deg_limit` and `deg_limit` degrees. It's recommended
+/// this value be less than 90, and to combine this stage with `RotationBuilder` for off-axis rotations
+/// larger than that. In practice, generally a less extreme value (probably under 30 degrees) is preferable.
 pub struct OffAxisRotationBuilder {
+    /// The number of variations to build when `build_stage` is called.
     pub samples: usize,
+    /// The maximum number of degrees in either direction which a generated stage may rotate an image.
     pub deg_limit: f64,
 }
 
@@ -64,7 +83,10 @@ where
     }
 }
 
+/// The actual stage that rotates the image, upon `execute` it will return a new image
+/// rotated about the center by `radians` degrees.
 pub struct OffAxisStage {
+    /// The number of radians to rotate by.
     radians: f64,
 }
 
@@ -81,7 +103,7 @@ where
                 Interpolation::Bicubic,
                 P::from_slice(&[Default::default(); 4]).to_owned(),
             ),
-            Tags(HashSet::from_iter([CWISE_LABEL.to_owned()])),
+            Tags(HashSet::from_iter([OFF_AXIS_LABEL.to_owned()])),
         )
     }
 
@@ -90,6 +112,9 @@ where
     }
 }
 
+/// Not to be confused with `OffAxisRotationBuilder`, this "rotates" the image
+/// as if you were to change its exif orientation data - that is to say it simply will
+/// create three stages that rotate the image by multiples of 90, 180, and 270 degrees.
 pub struct RotationBuilder;
 
 impl<P: Pixel + 'static, R: Rng> StageBuilder<P, R> for RotationBuilder {
@@ -112,6 +137,7 @@ impl<P: Pixel + 'static, R: Rng> StageBuilder<P, R> for RotationBuilder {
     }
 }
 
+/// A stage that rotates an image 90 degrees clockwise.
 pub struct ClockwiseStage;
 
 impl<P: Pixel + 'static> ImageStage<P> for ClockwiseStage {
@@ -127,6 +153,7 @@ impl<P: Pixel + 'static> ImageStage<P> for ClockwiseStage {
     }
 }
 
+/// A stage that rotates an image 90 degrees counterclockwise.
 pub struct CclockwiseStage;
 
 impl<P: Pixel + 'static> ImageStage<P> for CclockwiseStage {
@@ -142,6 +169,7 @@ impl<P: Pixel + 'static> ImageStage<P> for CclockwiseStage {
     }
 }
 
+/// A stage that flips an image upside down.
 pub struct UpsideDownStage;
 
 impl<P: Pixel + 'static> ImageStage<P> for UpsideDownStage {
@@ -157,8 +185,14 @@ impl<P: Pixel + 'static> ImageStage<P> for UpsideDownStage {
     }
 }
 
+/// A builder that will yield two stages: a brighten and darken stage, which will change the image
+/// pixel intensity across all channels by a random value between `min_luma` and `max_luma`. Note that
+/// `i32` is significantly higher than the 8-bit channel value, so this range should be fairly small or
+/// all pixels will end up becoming black/white.
 pub struct LuminosityBuilder {
+    /// The minimum degree of intensity we can brighten/darken by.
     pub min_luma: i32,
+    /// The maximum degree of intensity we can brighten/daren by.
     pub max_luma: i32,
 }
 
@@ -183,7 +217,10 @@ impl<P: Pixel + 'static, R: Rng> StageBuilder<P, R> for LuminosityBuilder {
     }
 }
 
+/// The actual stage that alters brightness and darkness in an image. It will shift all pixels
+/// by a constant `value`, negative for darkening and positive for brightening.
 pub struct LuminosityStage {
+    /// The number to add to all pixel channels in the image.
     value: i32,
 }
 
@@ -210,9 +247,15 @@ impl<P: Pixel + 'static> ImageStage<P> for LuminosityStage {
     }
 }
 
+/// A builder that will create `samples` stages that will perform a gaussian blur on the image
+/// with a standard deviation between `min_sigma` and `max_sigma` (this is esssentially a uniform
+/// distribution over a normal distribution of blurred versions of the image).
 pub struct BlurBuilder {
+    /// The number of blurred variants to create
     pub samples: usize,
+    /// The minimum standard deviation in the gaussian blur kernel
     pub min_sigma: f32,
+    /// The maximum standard deviation in the gaussian blur kernel
     pub max_sigma: f32,
 }
 
@@ -233,7 +276,10 @@ impl<P: Pixel + 'static, R: Rng> StageBuilder<P, R> for BlurBuilder {
     }
 }
 
+/// The actual stage which blurs the image, it will blur the input image with a gaussian blur
+/// whose kernel's standard deviation is `sigma`.
 pub struct BlurStage {
+    /// The standard deviation of the gaussian blur kernel.
     pub sigma: f32,
 }
 
