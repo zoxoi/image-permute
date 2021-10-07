@@ -43,7 +43,7 @@ impl<P: AsRef<Path>> TaggedImage<P> {
 
 fn main() {
     use executors::FusedExecutor;
-    use stages::{LuminosityBuilder, OffAxisRotationBuilder, RotationBuilder};
+    use stages::RotationBuilder;
 
     let files: Vec<_> = glob("./images/*")
         .unwrap()
@@ -52,17 +52,9 @@ fn main() {
 
     let transformer: FusedExecutor<StdRng, _> = FusedExecutor::new("./processed")
         .add_stage(Box::new(BlurBuilder {
-            samples: 2,
+            samples: 1,
             min_sigma: 5.,
             max_sigma: 10.,
-        }))
-        .add_stage(Box::new(LuminosityBuilder {
-            min_luma: 30,
-            max_luma: 50,
-        }))
-        .add_stage(Box::new(OffAxisRotationBuilder {
-            samples: 3,
-            deg_limit: 40.,
         }))
         .add_stage(Box::new(RotationBuilder));
 

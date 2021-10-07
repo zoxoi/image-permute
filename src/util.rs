@@ -2,16 +2,16 @@ use std::ops::AddAssign;
 
 use num::Integer;
 
-pub trait PowerSetAdapter<N>: ExactSizeIterator<Item = N>
+pub trait SetEnumerator<N>: ExactSizeIterator<Item = N>
 where
     N: Integer,
 {
     #[inline]
-    fn power_set(self) -> PowerSetIterator<N>
+    fn possibilities(self) -> SetVariationIterator<N>
     where
         Self: Sized,
     {
-        PowerSetIterator {
+        SetVariationIterator {
             maxes: self.collect(),
             variation: None,
             finished: false,
@@ -19,14 +19,14 @@ where
     }
 }
 
-impl<N, I> PowerSetAdapter<N> for I
+impl<N, I> SetEnumerator<N> for I
 where
     N: Integer,
     I: ExactSizeIterator<Item = N>,
 {
 }
 
-pub struct PowerSetIterator<N>
+pub struct SetVariationIterator<N>
 where
     N: Integer,
 {
@@ -35,7 +35,7 @@ where
     finished: bool,
 }
 
-impl<'a, N> Iterator for PowerSetIterator<N>
+impl<'a, N> Iterator for SetVariationIterator<N>
 where
     N: Integer + AddAssign + Clone + Copy,
 {
@@ -76,7 +76,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::util::PowerSetAdapter;
+    use crate::util::SetEnumerator;
 
     #[test]
     fn power_set() {
@@ -101,7 +101,7 @@ mod test {
             vec![3, 1, 1],
         ];
 
-        let result = maxes.into_iter().power_set().collect::<Vec<_>>();
+        let result = maxes.into_iter().possibilities().collect::<Vec<_>>();
         assert_eq!(result, expected);
     }
 
@@ -118,7 +118,7 @@ mod test {
             vec![2, 0, 1],
         ];
 
-        let result = maxes.into_iter().power_set().collect::<Vec<_>>();
+        let result = maxes.into_iter().possibilities().collect::<Vec<_>>();
         assert_eq!(result, expected);
     }
 
@@ -126,6 +126,6 @@ mod test {
     fn power_set_empty() {
         let maxes: Vec<i32> = vec![];
 
-        assert_eq!(maxes.into_iter().power_set().next(), None);
+        assert_eq!(maxes.into_iter().possibilities().next(), None);
     }
 }

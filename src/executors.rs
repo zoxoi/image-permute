@@ -5,7 +5,7 @@ use image::{imageops, Rgba};
 use imageproc::definitions::Image;
 use rand::{Rng, SeedableRng};
 
-use crate::{traits::StageBuilder, util::PowerSetAdapter, TaggedImage, Tags};
+use crate::{traits::StageBuilder, util::SetEnumerator, TaggedImage, Tags};
 
 pub struct FusedExecutor<R, OP>
 where
@@ -58,7 +58,7 @@ where
         self.stages
             .iter()
             .map(|bd| bd.variations() * (bd.should_execute(tags) as usize))
-            .power_set()
+            .possibilities()
             .map(|set| {
                 set.into_iter()
                     .enumerate()
