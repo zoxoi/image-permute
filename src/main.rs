@@ -11,8 +11,6 @@ mod stages;
 mod traits;
 mod util;
 
-// TODO: Stages =
-
 use std::{collections::HashSet, fs, iter::Iterator, path::Path};
 
 use crate::stages::BlurBuilder;
